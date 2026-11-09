@@ -93,6 +93,7 @@
   .ch.ok{background:#b2f2bb;box-shadow:0 6px 0 #51cf66}
   .ch.ng{background:#ffe3e3;box-shadow:0 6px 0 #ffa8a8;animation:shake .3s}
   @keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+  .crit{color:#e03131;font-size:26px;text-shadow:2px 2px 0 #ffe066;display:inline-block;animation:pop .4s}
   .msg{text-align:center;font-size:22px;font-weight:800;min-height:34px;margin-top:10px}
   .combo{text-align:center;font-size:15px;color:#e8590c;min-height:20px}
 
@@ -121,7 +122,7 @@
   <!-- タイトル -->
   <section id="title">
     <h1>けいさん<br>モンスターバトル</h1>
-    <p class="sub">こたえをえらんで モンスターを たおそう!<br><small>3びき たおすと ドラゴンの ボスが でるぞ!</small></p>
+    <p class="sub">こたえをえらんで モンスターを たおそう!<br><small>3びき たおすと ドラゴンの ボスが でるぞ!<br>💡ヒントを みないで せいかいすると「かいしんの いちげき」!</small></p>
     <div class="savebox" style="margin:0 0 14px">
       <b>💾 ずかんの セーブ</b>
       <p>ゲームが こうしんされると ずかんが きえることが あるよ。セーブしておけば ロードで もどせるよ!</p>
@@ -190,7 +191,7 @@
     <div class="card">
       <div class="q" id="q"></div>
       <div class="pics" id="pics"></div>
-      <button class="hintbtn" id="hintBtn">💡 えで みる</button>
+      <button class="hintbtn" id="hintBtn">💡 ヒント(えで みる)</button>
     </div>
     <div class="choices" id="choices"></div>
     <div class="msg" id="msg"></div>
@@ -1154,7 +1155,7 @@ function bgmStop(){if(bgm.timer)clearInterval(bgm.timer);bgm.timer=null;bgm.song
 const FRUITS=["🍎","🍓","🍊","🍙","⭐","🐟","🍩","🚗"];
 const HITS=5,BOSS_HITS=8;
 let mode="add",stage=1,maxHp=HITS,hp=HITS,cur=null,missThisMon=0,combo=0,locked=false;
-let dan=1,ord="seq",seqList=[],seqIdx=0,mon=null;
+let dan=1,ord="seq",seqList=[],seqIdx=0,mon=null,usedHint=false;
 
 let seqOp="add"; // じゅんばんモードの しゅるい
 const doneKey=d=>seqOp==="sub"?"s"+d:String(d);
@@ -1216,7 +1217,7 @@ function pickMonsterNew(){
   return{id:(kira?G.shiny:G.t)+i,boss:false,kira,tier};
 }
 function makeQ(){
-  if(mode==="seq")return seqList[seqIdx];
+  if(mode==="seq")return seqList[seqIdx%seqList.length];  // たりなければ もういちど はじめから
   let m=mode;
   if(m==="mix")m=Math.random()<.5?"add":"sub";
   let q;
@@ -1250,8 +1251,8 @@ function newMonster(){
   if(mode==="seq"){
     seqList=buildSeq(dan);
     if(mon.boss){const extra=buildSeq(dan).sort(()=>Math.random()-.5);seqList=seqList.concat(extra);}
-    seqIdx=0;maxHp=seqList.length;
-  }else maxHp=mon.boss?BOSS_HITS:(TIER_HP[mon.tier]||HITS);
+    seqIdx=0;maxHp=seqList.length*2;
+  }else maxHp=(mon.boss?BOSS_HITS:(TIER_HP[mon.tier]||HITS))*2;
   hp=maxHp;
   const el=$("monster");el.className="monster";el.innerHTML="";el.appendChild(canvasFor(mon.id));
   $("arena").className="arena"+(mon.boss?" boss":mon.kira?" kira":"");
@@ -1271,8 +1272,8 @@ function nextQ(){
   const box='<span class="box">?</span>';
   $("q").innerHTML=cur.type==="ten"?`${cur.a} ＋ ${box} ＝ 10`:cur.type==="add"?`${cur.a} ＋ ${cur.b} ＝ ${box}`:`${cur.a} － ${cur.b} ＝ ${box}`;
   const p=$("pics");p.innerHTML=picsHTML(cur);
-  const showPics=mode==="seq"||(mode!=="hard"&&stage<=2);
-  p.classList.toggle("on",showPics);$("hintBtn").classList.toggle("hidden",showPics);
+  usedHint=false;            // えを みないで せいかい → かいしんの いちげき
+  p.classList.remove("on");$("hintBtn").classList.remove("hidden");
   $("msg").textContent="";
   const list=choicesFor();
   $("choices").className="choices n"+list.length;
@@ -1284,18 +1285,19 @@ function answer(btn){
   if(n===cur.ans){
     locked=true;combo++;btn.classList.add("ok");sOk();
     $("q").querySelector(".box").textContent=cur.ans;
-    const words=["せいかい!","すごい!","やったね!","てんさい!","ナイス!"];
-    $("msg").textContent=words[rnd(0,words.length-1)]+" ⚔️";
+    const crit=!usedHint;
+    if(crit){$("msg").innerHTML='<span class="crit">💥 かいしんの いちげき!</span>';tone([880,1175,1568,2093],0.07,"square",0.09);}
+    else $("msg").textContent=["あたった!","せいかい!","いいぞ!"][rnd(0,2)]+" ⚔️";
     $("combo").textContent=combo>=3?`🔥 ${combo}れんぞく せいかい!`:"";
-    hp--;if(mode==="seq")seqIdx++;
+    hp=Math.max(0,hp-(crit?2:1));if(mode==="seq")seqIdx++;
     const el=$("monster");el.classList.remove("hit");void el.offsetWidth;el.classList.add("hit");
-    const b=$("boom");b.textContent=combo>=5?"🌟":combo>=3?"⚡":"💥";b.classList.remove("show");void b.offsetWidth;b.classList.add("show");
+    const b=$("boom");b.textContent=crit?(combo>=3?"🌟":"💥"):"✊";b.style.fontSize=crit?"84px":"48px";b.classList.remove("show");void b.offsetWidth;b.classList.add("show");
     updateHP();
     if(hp<=0)setTimeout(()=>{bgmStop();el.classList.add("dead");mon.boss?sBossWin():sWin();setTimeout(showWin,800)},450);
     else setTimeout(nextQ,900);
   }else{
     // まちがえると モンスターの はんげき! すこしの あいだ おせなくなる
-    combo=0;missThisMon++;locked=true;btn.classList.add("ng");sNg();
+    combo=0;missThisMon++;locked=true;usedHint=true;btn.classList.add("ng");sNg();
     $("combo").textContent="";
     $("msg").textContent="モンスターの はんげき! えを みて かぞえてね 👀";
     $("pics").classList.add("on");$("hintBtn").classList.add("hidden");
@@ -1327,7 +1329,7 @@ function goHome(){bgmStop();$("win").classList.remove("on");$("battle").classLis
 
 document.querySelectorAll(".mode[data-mode]").forEach(b=>b.addEventListener("click",()=>{tone([880],0.05);startMode(b.dataset.mode)}));
 $("choices").addEventListener("click",e=>{const b=e.target.closest(".ch");if(b&&!b.disabled)answer(b);});
-$("hintBtn").addEventListener("click",()=>{$("pics").classList.add("on");$("hintBtn").classList.add("hidden");});
+$("hintBtn").addEventListener("click",()=>{usedHint=true;$("pics").classList.add("on");$("hintBtn").classList.add("hidden");});
 $("nextBtn").addEventListener("click",()=>{$("win").classList.remove("on");stage++;if(mode==="seq"){const dl=danList();dan=dan<dl[dl.length-1]?dan+1:dl[0];}newMonster();});
 $("homeBtn").addEventListener("click",goHome);
 $("backBtn").addEventListener("click",goHome);
