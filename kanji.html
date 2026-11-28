@@ -1800,6 +1800,8 @@ var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
         c.lineJoin = "round";
         c.lineWidth = (o.width || 0.07) * W;
         for (var i = 0; i < S.length && i <= n; i++) {
+            if (o.only != null && i !== o.only)
+                continue;
             var s = S[i];
             var lim = Infinity;
             if (i === n) {
@@ -1964,7 +1966,7 @@ var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
             c.clearRect(0, 0, W, W);
             if (o.under)
                 drawRef(c, k, W, { color: o.under, width: o.width, brush: true });
-            drawRef(c, k, W, { upto: i, frac: f, color: o.color, active: o.active, width: o.width, nums: true, numColor: o.numColor, nr: o.nr, brush: true });
+            drawRef(c, k, W, { upto: i, frac: f, color: o.color, active: o.active, width: o.width, brush: true });
             if (f >= 1) {
                 i++;
                 t0 = now + 280;
@@ -2147,7 +2149,9 @@ var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
         ctx.lineTo(p.x * W, p.y * W);
         ctx.stroke();
     }
-    function endStroke() { curS = null; touchId = null; updateBtns(); }
+    function endStroke() { curS = null; touchId = null; updateBtns(); refreshGuide(); }
+    function refreshGuide() { if (guideOn && !animating)
+        setGuide(true, guideRed); }
     // ゆび・タッチペン：さいしょの 1本だけ つかう（ほかの ゆびや てのひらは むし）
     cv.addEventListener("touchstart", function (e) {
         e.preventDefault();
@@ -2505,8 +2509,13 @@ var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
         var c = gcv.getContext("2d"), W = gcv.width;
         c.setTransform(1, 0, 0, 1, 0, 0);
         c.clearRect(0, 0, W, W);
-        if (on && curK)
-            drawRef(c, curK, W, { color: red ? "rgba(224,49,49,.42)" : "rgba(43,58,85,.16)", width: 0.085, nums: true, numColor: red ? "#e03131" : "#4dabf7", brush: true });
+        if (!on || !curK)
+            return;
+        drawRef(c, curK, W, { color: red ? "rgba(224,49,49,.42)" : "rgba(43,58,85,.16)", width: 0.085, brush: true });
+        // つぎに かく 線に 色を つける
+        var nx = strokes.length;
+        if (!red && !locked && nx < refOf(curK).length)
+            drawRef(c, curK, W, { only: nx, color: "rgba(255,146,43,.75)", width: 0.085, brush: true });
     }
     var animating = false;
     function playOrder(red, done) {
@@ -2538,12 +2547,10 @@ var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
         animating = false;
         var g0 = M.guide || !!retry;
         setGuide(g0, false);
-        if (M.guide && !retry)
-            playOrder(false, function () { return setGuide(true, false); }); // なぞりは さいしょに かきじゅんを 見せる
         $("btnHint").innerHTML = M.hint && !retry ? "✍️ かきじゅん(ヒント)" : "✍️ かきじゅんを 見る";
-        $("howto").textContent = M.guide ? "うすい 字を なぞって こうげき!" : M.model ? "お手本を 見て かいて こうげき!" : "あかい わくの ことばを かんじで かこう!";
+        $("howto").textContent = M.guide ? "オレンジの 線から じゅんに なぞろう!" : M.model ? "お手本を 見て かいて こうげき!" : "あかい わくの ことばを かんじで かこう!";
         if (retry)
-            $("howto").textContent = "ばんごうの じゅんに もういちど!";
+            $("howto").textContent = "オレンジの 線から じゅんに もういちど!";
         $("msg").innerHTML = "";
         updateBtns();
     }
@@ -2663,9 +2670,9 @@ var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
     ["trace", "look", "test"].forEach(function (m) { return tap("m_" + m, function () { tone([880], 0.05); startMode(m); }); });
     tap("btnGo", attack);
     tap("btnUndo", function () { if (locked)
-        return; strokes.pop(); redraw(); updateBtns(); });
+        return; strokes.pop(); redraw(); updateBtns(); refreshGuide(); });
     tap("btnClear", function () { if (locked)
-        return; strokes = []; redraw(); updateBtns(); });
+        return; strokes = []; redraw(); updateBtns(); refreshGuide(); });
     tap("btnHint", function () {
         if (locked || animating)
             return;
